@@ -4,7 +4,7 @@
 #include <terminal.hpp>
 #include <editor.hpp>
 
-//Version
+//Version string
 const std::string version = "1.0.0";
 
 int main(int argc, char** argv){

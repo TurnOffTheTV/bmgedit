@@ -11,7 +11,11 @@ bool newFile = false;
 bool useColorCodes = false;
 bool developerMode = false;
 
+//Message to display when there is an error
 const std::string errorMessage = "!!!ERROR!!!\nMessage could not\nbe loaded.";
+
+//Current screen in editor
+enum EditorScreen screen = PICK_ENTRY;
 
 int runEditor(std::filesystem::path filename){
 	//Error if file doesn't exist
@@ -150,6 +154,11 @@ int runEditor(std::filesystem::path filename){
 	system("stty raw");
 	bool runProgram = true;
 	unsigned int entryIndex = 0;
+	unsigned int entryPickPage = 0;
+	unsigned int menuIndex = 0;
+	unsigned int menuPage = 0;
+	unsigned int controlIndex = 0;
+	unsigned int controlPickPage = 0;
 	while(runProgram){
 		//Set up terminal
 		setBackgroundColor(BLACK);
@@ -162,30 +171,167 @@ int runEditor(std::filesystem::path filename){
 		moveCursor(1,1);
 		std::cout << "\x1b[1mBMGEdit\x1b[22m";
 		if(readOnly) std::cout << " | Read-only";
-		std::cout << " | Press 'q' to quit";
+		if(screen==PICK_ENTRY) std::cout << " | Press 'q' to quit";
+		if(screen==EDIT_ENTRY) std::cout << " | Press 'ESC' for menu";
+		if(screen==ENTRY_MENU | screen==PICK_CONTROL | screen==CONTROL_DETAIL) std::cout << " | Press 'q' to return to entry edit";
 		moveCursor(1,2);
 		for(unsigned int i=0;i<terminalWidth;i++) std::cout << '=';
 
-		//DEBUG: print entries
-		moveCursor(1,3);
-		std::cout << "Entry " << entryIndex << ": ";
-		bmgPrintMessage(entries[entryIndex].message,1,4);
+		//Draw screens
+		if(screen!=ENTRY_MENU) menuIndex=0;
+		if(screen!=PICK_CONTROL) controlIndex=0;
+		switch(screen){
+			case PICK_ENTRY:
+				for(unsigned int i=entryPickPage*(terminalHeight-2);i<(entryPickPage+1)*(terminalHeight-2);i++){
+					if(i>=numEntries) break;
+					moveCursor(1,i-entryPickPage*(terminalHeight-2)+3);
+					std::cout << "  Entry " << i << ": ";
+					bmgPrintLine(entries[i].message);
+					std::cout << "...";
+				}
 
-		//Handle key presses
-		switch(getchar()){
-			case 'q':
-				runProgram=false;
+				moveCursor(1,entryIndex-entryPickPage*(terminalHeight-2)+3);
+				std::cout << '>';
+
+				switch(getchar()){
+					case 'q':
+						runProgram=false;
+					break;
+					case '\x0d':
+						screen=EDIT_ENTRY;
+					break;
+					case '\x1b':
+						if(getchar()=='\x5b'){
+							switch(getchar()){
+								case '\x41':
+									if(entryIndex>0){
+										entryIndex--;
+										if(entryIndex-entryPickPage*(terminalHeight-2)+3<3) entryPickPage--;
+									}
+								break;
+								case '\x42':
+									if(entryIndex<numEntries-1){
+										entryIndex++;
+										if(entryIndex-entryPickPage*(terminalHeight-2)>terminalHeight-3) entryPickPage++;
+									}
+								break;
+							}
+						}
+					break;
+				}
 			break;
-			case '\x1b':
-				if(getchar()=='\x5b'){
-					switch(getchar()){
-						case '\x41':
-							if(entryIndex>0) entryIndex--;
+			case EDIT_ENTRY:
+				bmgPrintMessage(entries[entryIndex].message,1,3);
+
+				switch(getchar()){
+					case '\x1b':
+						screen=ENTRY_MENU;
+					break;
+				}
+			break;
+			case ENTRY_MENU:
+				for(unsigned int i=menuPage*(terminalHeight-2);i<(menuPage+1)*(terminalHeight-2);i++){
+					if(i>=2) break;
+					moveCursor(1,i-menuPage*(terminalHeight-2)+3);
+					switch(i){
+						case 0:
+							std::cout << " Save and back to entry list";
 						break;
-						case '\x42':
-							if(entryIndex<numEntries-1) entryIndex++;
+						case 1:
+							std::cout << " Insert escape code";
 						break;
 					}
+				}
+
+				moveCursor(1,menuIndex-menuPage*(terminalHeight-2)+3);
+				std::cout << '>';
+
+				switch(getchar()){
+					case 'q':
+						screen=EDIT_ENTRY;
+					break;
+					case '\x0d':
+						switch(menuIndex){
+							case 0:
+								screen=PICK_ENTRY;
+							break;
+							case 1:
+								screen=PICK_CONTROL;
+							break;
+						}
+					break;
+					case '\x1b':
+						if(getchar()=='\x5b'){
+							switch(getchar()){
+								case '\x41':
+									if(menuIndex>0){
+										menuIndex--;
+										if(menuIndex-menuPage*(terminalHeight-2)+3<3) menuPage--;
+									}
+								break;
+								case '\x42':
+									if(menuIndex<1){
+										menuIndex++;
+										if(menuIndex-menuPage*(terminalHeight-2)>terminalHeight-3) menuPage++;
+									}
+								break;
+							}
+						}
+					break;
+				}
+			break;
+			case PICK_CONTROL:
+				for(unsigned int i=controlPickPage*(terminalHeight-2);i<(controlPickPage+1)*(terminalHeight-2);i++){
+					if(i>=4) break;
+					moveCursor(1,i-controlPickPage*(terminalHeight-2)+3);
+					switch(i){
+						case 0:
+							std::cout << " Delivery control";
+						break;
+						case 1:
+							std::cout << " Option box";
+						break;
+						case 2:
+							std::cout << " Read value";
+						break;
+						case 3:
+							std::cout << " Text color";
+						break;
+					}
+				}
+
+				moveCursor(1,controlIndex-controlPickPage*(terminalHeight-2)+3);
+				std::cout << '>';
+
+				switch(getchar()){
+					case 'q':
+						screen=EDIT_ENTRY;
+					break;
+					case '\x1b':
+						if(getchar()=='\x5b'){
+							switch(getchar()){
+								case '\x41':
+									if(controlIndex>0){
+										controlIndex--;
+										if(controlIndex-controlPickPage*(terminalHeight-2)+3<3) controlPickPage--;
+									}
+								break;
+								case '\x42':
+									if(controlIndex<3){
+										controlIndex++;
+										if(controlIndex-controlPickPage*(terminalHeight-2)>terminalHeight-3) controlPickPage++;
+									}
+								break;
+							}
+						}
+					break;
+				}
+			break;
+			case CONTROL_DETAIL:
+				switch(getchar()){
+					case 'q':
+						screen=EDIT_ENTRY;
+					break;
 				}
 			break;
 		}
@@ -221,6 +367,20 @@ unsigned int bmgMessageLength(char* msgBuffer){
 	return length;
 }
 
+void bmgPrintLine(std::string msg){
+	for(unsigned int i=0;i<msg.length();i++){
+		if(msg[i]=='\x1a'){
+			unsigned char escLength = msg[i+1];
+			i+=escLength-1;
+			continue;
+		}
+		if(msg[i]=='\x0a'){
+			break;
+		}
+		std::cout << msg[i];
+	}
+}
+
 void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 	unsigned int line = y;
 	bool useOption = false;
@@ -247,6 +407,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 			switch(msg[i+2]){
 				case '\x00':
 					//Message controls?
+					if(msg[i+4]=='\x00') std::cout << "{slow text display}";
 					if(msg[i+4]=='\x01') std::cout << "{auto-close message}";
 				break;
 				case '\x01':
@@ -256,7 +417,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 					if(msg[i+4]=='\x01') noOption=msg.substr(i+5,escLength-5);
 				break;
 				case '\x02':
-					//Save record
+					//Get values
 					if(msg[i+4]=='\x02') std::cout << "{box game record time}";
 					if(msg[i+4]=='\x03') std::cout << "{# of shines for blue coins}";
 					if(msg[i+4]=='\x04'){
