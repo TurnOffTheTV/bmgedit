@@ -28,6 +28,10 @@ unsigned int bmgMessageLength(char* msgBuffer);
 //Print first line of BMG message at cursor position
 void bmgPrintLine(std::string msg);
 //Print full BMG message to console, reading escaped sequences
-void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y);
+void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y,unsigned int entryCharIndex);
 
+//Get row # of character in BMG
+unsigned int bmgGetRow(std::string msg,unsigned int index);
+//Get column # of character in BMG
+unsigned int bmgGetColumn(std::string msg,unsigned int index);
 #endif

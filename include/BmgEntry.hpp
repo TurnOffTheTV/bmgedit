@@ -12,6 +12,7 @@ struct BmgEntry {
 	unsigned short startFrame;
 	unsigned short endFrame;
 	enum SoundId soundID;
+	unsigned int charLength;
 };
 
 #endif

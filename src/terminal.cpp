@@ -25,7 +25,7 @@ void printHelp(){
 	std::cout << "bmgedit <args> <filename.bmg>" << std::endl;
 	std::cout << "\x1b[1mArgs:\x1b[22m" << std::endl;
 	std::cout << "-h : Display this help page. This will prevent the editor from opening." << std::endl;
-	std::cout << "-v : Print the version. This will prevent the editor from opening.";
+	std::cout << "-v : Print the version. This will prevent the editor from opening." << std::endl;
 	std::cout << "-r : Open file as read-only." << std::endl;
 	std::cout << "-c : Create a new BMG file with the filename specified. This will overwrite any existing file as well." << std::endl;
 	std::cout << "-a : Use ANSI color codes instead of RGB values when rendering text. Use this if colors don't show up correctly in your terminal." << std::endl;

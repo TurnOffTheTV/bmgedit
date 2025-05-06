@@ -14,6 +14,31 @@ bool developerMode = false;
 //Message to display when there is an error
 const std::string errorMessage = "!!!ERROR!!!\nMessage could not\nbe loaded.";
 
+//Control code representation
+const char* ctrl_unknown = "[unknown control code]";
+const char* ctrl_slow = "[slow display]";
+const char* ctrl_speed = "[speed:%i]";
+const char* ctrl_autoClose = "[auto-close]";
+const char* ctrl_selectYes = "[yes option:%s]";
+const char* ctrl_selectNo = "[no option:%s]";
+const char* ctrl_numBananas = "[# of bananas]";
+const char* ctrl_numCoconuts = "[# of coconuts]";
+const char* ctrl_numPineapples = "[# of pineapples]";
+const char* ctrl_numDurians = "[# of durians]";
+const char* ctrl_piantaRecord = "[pianta village piantissimo record]";
+const char* ctrl_gelatoRecord = "[gelato beach piantissimo record]";
+const char* ctrl_boxRecord = "[box game record]";
+const char* ctrl_numBlueShines = "[# of blue coin shines]";
+const char* ctrl_nokiRecord = "[noki bay piantissimo record]";
+const char* ctrl_color = "[text color:%s]";
+const char* ctrl_white = "white";
+const char* ctrl_grey = "grey";
+const char* ctrl_red = "red";
+const char* ctrl_blue = "blue";
+const char* ctrl_yellow = "yellow";
+const char* ctrl_green = "green";
+const char* ctrl_garbage = "garbage";
+
 //Current screen in editor
 enum EditorScreen screen = PICK_ENTRY;
 
@@ -122,6 +147,17 @@ int runEditor(std::filesystem::path filename){
 
 		//Copy message
 		entries[i].message = std::string(messagesBuffer+msgOffset,bmgMessageLength(messagesBuffer+msgOffset));
+
+		entries[i].charLength=0;
+
+		for(unsigned int j=0;j<entries[i].message.length();j++){
+			entries[i].charLength++;
+			if(entries[i].message[j]=='\x1a'){
+				unsigned char escLength = entries[i].message[j+1];
+				j+=escLength-1;
+				continue;
+			}
+		}
 		
 		if(entryLength==4) continue;
 
@@ -155,6 +191,7 @@ int runEditor(std::filesystem::path filename){
 	bool runProgram = true;
 	unsigned int entryIndex = 0;
 	unsigned int entryPickPage = 0;
+	unsigned int entryCharIndex = 0;
 	unsigned int menuIndex = 0;
 	unsigned int menuPage = 0;
 	unsigned int controlIndex = 0;
@@ -172,8 +209,8 @@ int runEditor(std::filesystem::path filename){
 		std::cout << "\x1b[1mBMGEdit\x1b[22m";
 		if(readOnly) std::cout << " | Read-only";
 		if(screen==PICK_ENTRY) std::cout << " | Press 'q' to quit";
-		if(screen==EDIT_ENTRY) std::cout << " | Press 'ESC' for menu";
-		if(screen==ENTRY_MENU | screen==PICK_CONTROL | screen==CONTROL_DETAIL) std::cout << " | Press 'q' to return to entry edit";
+		if(screen==EDIT_ENTRY && !readOnly) std::cout << " | Press ^m for menu";
+		if(screen==ENTRY_MENU || screen==PICK_CONTROL || screen==CONTROL_DETAIL || screen==EDIT_ENTRY && readOnly) std::cout << " | Press 'q' to return to entry list";
 		moveCursor(1,2);
 		for(unsigned int i=0;i<terminalWidth;i++) std::cout << '=';
 
@@ -198,6 +235,7 @@ int runEditor(std::filesystem::path filename){
 						runProgram=false;
 					break;
 					case '\x0d':
+						entryCharIndex=0;
 						screen=EDIT_ENTRY;
 					break;
 					case '\x1b':
@@ -221,11 +259,34 @@ int runEditor(std::filesystem::path filename){
 				}
 			break;
 			case EDIT_ENTRY:
-				bmgPrintMessage(entries[entryIndex].message,1,3);
+				bmgPrintMessage(entries[entryIndex].message,1,3,entryCharIndex);
+
+				if(!readOnly){
+					showCursor();
+					moveCursor(bmgGetColumn(entries[entryIndex].message,entryCharIndex)+1,bmgGetRow(entries[entryIndex].message,entryCharIndex)+3);
+				}
 
 				switch(getchar()){
-					case '\x1b':
+					case 13:
+						if(readOnly) break;
+						hideCursor();
 						screen=ENTRY_MENU;
+					break;
+					case 'q':
+						if(!readOnly) break;
+						screen=PICK_ENTRY;
+					break;
+					case '\x1b':
+						if(getchar()=='\x5b'){
+							switch(getchar()){
+								case '\x44':
+									if(entryCharIndex>0) entryCharIndex--;
+								break;
+								case '\x43':
+									if(entryCharIndex<entries[entryIndex].charLength) entryCharIndex++;
+								break;
+							}
+						}
 					break;
 				}
 			break;
@@ -235,7 +296,7 @@ int runEditor(std::filesystem::path filename){
 					moveCursor(1,i-menuPage*(terminalHeight-2)+3);
 					switch(i){
 						case 0:
-							std::cout << " Save and back to entry list";
+							std::cout << " Back to entry edit";
 						break;
 						case 1:
 							std::cout << " Insert escape code";
@@ -248,12 +309,12 @@ int runEditor(std::filesystem::path filename){
 
 				switch(getchar()){
 					case 'q':
-						screen=EDIT_ENTRY;
+						screen=PICK_ENTRY;
 					break;
 					case '\x0d':
 						switch(menuIndex){
 							case 0:
-								screen=PICK_ENTRY;
+								screen=EDIT_ENTRY;
 							break;
 							case 1:
 								screen=PICK_CONTROL;
@@ -305,7 +366,7 @@ int runEditor(std::filesystem::path filename){
 
 				switch(getchar()){
 					case 'q':
-						screen=EDIT_ENTRY;
+						screen=PICK_ENTRY;
 					break;
 					case '\x1b':
 						if(getchar()=='\x5b'){
@@ -381,7 +442,7 @@ void bmgPrintLine(std::string msg){
 	}
 }
 
-void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
+void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y,unsigned int entryCharIndex){
 	unsigned int line = y;
 	bool useOption = false;
 	std::string yesOption = "";
@@ -400,37 +461,81 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 	}
 
 
+	unsigned int charLength = 0;
 	for(unsigned int i=0;i<msg.length();i++){
+		charLength++;
 		if(msg[i]=='\x1a'){
+			//Sure wish this part of the decomp was easier to read
 			unsigned char escLength = msg[i+1];
+
+			if(!readOnly){
+				std::cout << "§";
+				if(entryCharIndex==charLength) std::cout << " ";
+			}
 
 			switch(msg[i+2]){
 				case '\x00':
+					if(!readOnly && entryCharIndex!=charLength) break;
 					//Message controls?
-					if(msg[i+4]=='\x00') std::cout << "{slow text display}";
-					if(msg[i+4]=='\x01') std::cout << "{auto-close message}";
+					if(escLength==5){
+						if(msg[i+4]=='\x01') std::cout << ctrl_autoClose;
+						if(msg[i+4]=='\x00') std::cout << ctrl_slow;
+					}else if (escLength==6){
+						if(msg[i+4]=='\x00') printf(ctrl_speed,(int)msg[i+5]);
+					}else{
+						std::cout << ctrl_unknown;
+					}
 				break;
 				case '\x01':
 					//Select settings
-					useOption=true;
-					if(msg[i+4]=='\x00') yesOption=msg.substr(i+5,escLength-5);
-					if(msg[i+4]=='\x01') noOption=msg.substr(i+5,escLength-5);
+					if(readOnly){
+						useOption=true;
+						if(msg[i+4]=='\x00') yesOption=msg.substr(i+5,escLength-5);
+						if(msg[i+4]=='\x01') noOption=msg.substr(i+5,escLength-5);
+					}else if(entryCharIndex==charLength){
+						if(msg[i+4]=='\x00') printf(ctrl_selectYes,msg.substr(i+5,escLength-5).c_str());
+						if(msg[i+4]=='\x01') printf(ctrl_selectNo,msg.substr(i+5,escLength-5).c_str());
+					}
 				break;
 				case '\x02':
-					//Get values
-					if(msg[i+4]=='\x02') std::cout << "{box game record time}";
-					if(msg[i+4]=='\x03') std::cout << "{# of shines for blue coins}";
-					if(msg[i+4]=='\x04'){
-						if(msg[i+5]=='\x00') std::cout << "{# of bananas}";
-						if(msg[i+5]=='\x01') std::cout << "{# of coconuts}";
-						if(msg[i+5]=='\x02') std::cout << "{# of pineapples}";
-						if(msg[i+5]=='\x03') std::cout << "{# of durians}";
+					if(!readOnly && entryCharIndex!=charLength) break;
+					//Get vars
+					switch(msg[i+4]){
+						case '\x00':
+							std::cout << ctrl_piantaRecord;
+						break;
+						case '\x01':
+							std::cout << ctrl_gelatoRecord;
+						break;
+						case '\x02':
+							std::cout << ctrl_boxRecord;
+						break;
+						case '\x03':
+							std::cout << ctrl_numBlueShines;
+						break;
+						case '\x04':
+							if(escLength==6){
+								if(msg[i+5]=='\x00') std::cout << ctrl_numBananas;
+								if(msg[i+5]=='\x01') std::cout << ctrl_numCoconuts;
+								if(msg[i+5]=='\x02') std::cout << ctrl_numPineapples;
+								if(msg[i+5]=='\x03') std::cout << ctrl_numDurians;
+							}else{
+								std::cout << ctrl_unknown;
+							}
+						break;
+						case '\x06':
+							std::cout << ctrl_nokiRecord;
+						break;
+						default:
+							std::cout << ctrl_unknown;
+						break;
 					}
 				break;
 				case '\xff':
 					//Change text color
 					switch(msg[i+5]){
 						case '\x00':
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_white);
 							if(useColorCodes){
 								setTextColor(BRIGHT_WHITE);
 							}else{
@@ -438,6 +543,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 							}
 						break;
 						case '\x01':
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_grey);
 							if(useColorCodes){
 								setTextColor(WHITE);
 							}else{
@@ -445,6 +551,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 							}
 						break;
 						case '\x02':
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_red);
 							if(useColorCodes){
 								setTextColor(BRIGHT_RED);
 							}else{
@@ -452,6 +559,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 							}
 						break;
 						case '\x03':
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_blue);
 							if(useColorCodes){
 								setTextColor(BRIGHT_BLUE);
 							}else{
@@ -459,6 +567,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 							}
 						break;
 						case '\x04':
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_yellow);
 							if(useColorCodes){
 								setTextColor(BRIGHT_YELLOW);
 							}else{
@@ -466,13 +575,20 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 							}
 						break;
 						case '\x05':
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_green);
 							if(useColorCodes){
 								setTextColor(BRIGHT_GREEN);
 							}else{
 								setTextColor(0,255,0);
 							}
 						break;
+						default:
+							if(!readOnly && entryCharIndex==charLength) printf(ctrl_color,ctrl_garbage);
+						break;
 					}
+				break;
+				default:
+					std::cout << ctrl_unknown;
 				break;
 			}
 
@@ -497,4 +613,35 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y){
 
 	setTextColor(WHITE);
 	setBackgroundColor(BLACK);
+}
+
+unsigned int bmgGetRow(std::string msg,unsigned int index){
+	unsigned int row = 0;
+	unsigned int charLength = 0;
+
+	for(unsigned int i=0;i<msg.length();i++){
+		charLength++;
+		if(msg[i]=='\x1a') i+=msg[i+1]-1;
+		if(msg[i]=='\x0a') row++;
+		if(charLength>=index) break;
+	}
+
+	return row;
+}
+
+unsigned int bmgGetColumn(std::string msg,unsigned int index){
+	unsigned int col = 0;
+	unsigned int charLength = 0;
+
+	if(index==0) return 0;
+
+	for(unsigned int i=0;i<msg.length();i++){
+		charLength++;
+		col++;
+		if(msg[i]=='\x1a') i+=msg[i+1]-1;
+		if(msg[i]=='\x0a') col=0;
+		if(charLength>=index) break;
+	}
+
+	return col;
 }
