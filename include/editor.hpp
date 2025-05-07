@@ -2,6 +2,7 @@
 #define EDITOR_HPP
 
 #include <filesystem>
+#include <BmgEntry.hpp>
 
 //Wether to open editor as read-only
 extern bool readOnly;
@@ -22,6 +23,9 @@ enum EditorScreen {
 
 //Run the actual BMG editor
 int runEditor(std::filesystem::path filename);
+
+//Save the file
+void saveBmgFile(std::filesystem::path path,std::vector<BmgEntry> entries,unsigned int numEntries,unsigned short entryLength);
 
 //Get length of BMG message
 unsigned int bmgMessageLength(char* msgBuffer);

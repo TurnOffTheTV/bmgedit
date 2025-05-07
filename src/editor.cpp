@@ -5,7 +5,6 @@
 #include <editor.hpp>
 #include <terminal.hpp>
 #include <isLittleEndian.hpp>
-#include <BmgEntry.hpp>
 #include "empty_bmg.h"
 
 bool readOnly = false;
@@ -54,32 +53,24 @@ int runEditor(std::filesystem::path filename){
 		return 1;
 	}
 
-	//Open stream based on flags
+	//Open stream
 	std::fstream bmgFile;
 	if(newFile){
-		if(readOnly){
-			bmgFile.open(filename,std::fstream::trunc | std::fstream::in);
-		}else{
-			bmgFile.open(filename,std::fstream::trunc | std::fstream::in | std::fstream::out);
-		}
+		bmgFile.open(filename,std::fstream::trunc | std::fstream::in | std::fstream::out);
 	}else{
-		if(readOnly){
-			bmgFile.open(filename,std::fstream::in);
-		}else{
-			bmgFile.open(filename,std::fstream::in | std::fstream::out);
-		}
-	}
-
-	if(newFile){
-		bmgFile.write((const char*)empty_bmg_data,empty_bmg_size);
-		bmgFile.flush();
-		bmgFile.seekp(std::fstream::beg);
+		bmgFile.open(filename,std::fstream::in);
 	}
 
 	//Check for errors opening file
 	if(!bmgFile.is_open()){
 		std::cout << "Failed to open file at " << filename << '.' << std::endl;
 		return 1;
+	}
+
+	if(newFile){
+		bmgFile.write((const char*)empty_bmg_data,empty_bmg_size);
+		bmgFile.flush();
+		bmgFile.seekp(std::fstream::beg);
 	}
 
 	//Check file magic
@@ -205,6 +196,8 @@ int runEditor(std::filesystem::path filename){
 		bmgFile.seekp(entryStart+entryLength);
 	}
 
+	bmgFile.close();
+
 	//Run UI
 	system("stty raw");
 	bool runProgram = true;
@@ -309,10 +302,41 @@ int runEditor(std::filesystem::path filename){
 					moveCursor(bmgGetColumn(entries[entryIndex].message,entryCharIndex)+1,bmgGetRow(entries[entryIndex].message,entryCharIndex)+3);
 				}
 
+				if(developerMode) std::cout << (int)getchar();
+
 				char keyChar = getchar();
 
-				if(keyChar>=32 && keyChar!=127){
+				if(keyChar>=32 && keyChar!=35 && keyChar!=36 && keyChar!=37 && keyChar!=43 && keyChar!=60 && keyChar!=62 && keyChar!=64 && keyChar!=127/* && keyChar!=165*/){
 					entries[entryIndex].message.insert(entryCharIndex,{keyChar});
+					entryCharIndex++;
+				}
+
+				if(keyChar==1){
+					entries[entryIndex].message.insert(entryCharIndex,{'@'});
+					entryCharIndex++;
+				}
+				if(keyChar==2){
+					entries[entryIndex].message.insert(entryCharIndex,{'#'});
+					entryCharIndex++;
+				}
+				if(keyChar==3){
+					entries[entryIndex].message.insert(entryCharIndex,{'%'});
+					entryCharIndex++;
+				}
+				if(keyChar==12){
+					entries[entryIndex].message.insert(entryCharIndex,{'<'});
+					entryCharIndex++;
+				}
+				if(keyChar==24){
+					entries[entryIndex].message.insert(entryCharIndex,{'+'});
+					entryCharIndex++;
+				}
+				if(keyChar==25){
+					entries[entryIndex].message.insert(entryCharIndex,"¥");
+					entryCharIndex++;
+				}
+				if(keyChar==26){
+					entries[entryIndex].message.insert(entryCharIndex,{'$'});
 					entryCharIndex++;
 				}
 
@@ -371,6 +395,7 @@ int runEditor(std::filesystem::path filename){
 				switch(getchar()){
 					case 'q':
 						screen=PICK_ENTRY;
+						saveBmgFile(filename,entries,numEntries,entryLength);
 					break;
 					case '\x0d':
 						switch(menuIndex){
@@ -460,7 +485,6 @@ int runEditor(std::filesystem::path filename){
 	}
 
 	//Clean up
-	bmgFile.close();
 	system("stty cooked");
 	showCursor();
 	setTextColor(DEFAULT);
@@ -469,6 +493,114 @@ int runEditor(std::filesystem::path filename){
 
 	//Return OK
 	return 0;
+}
+
+void saveBmgFile(std::filesystem::path path,std::vector<BmgEntry> entries,unsigned int numEntries,unsigned short entryLength){
+	std::fstream file;
+	file.open(path,std::fstream::trunc | std::fstream::out);
+
+	file.flush();
+
+	std::vector<std::streampos> entryOffsets;
+
+	unsigned int fileLength = 1;
+
+	//Header
+	file.write("MESGbmg1",8);//magic
+	file.write("\x00\x00\x00\x00",4);//file length (will be filled later)
+	file.write("\x00\x00\x00\x02",4);//section number
+	for(int i=0;i<16;i++) file.write("\x00",1);//padding
+
+	//Info section
+	file.write("INF1",4);//magic
+
+	unsigned char extraBytes = 0;
+	unsigned int infLength = 16+numEntries*entryLength;
+	while(infLength%32!=0){
+		infLength++;
+		extraBytes++;
+	}
+	fileLength+=infLength/32;
+	if(isLittleEndian()){
+		unsigned int temp = infLength;
+		infLength=std::byteswap(temp);
+	}
+	file.write((const char*)&infLength,4);//section length
+
+	unsigned int tNumEntries = numEntries;
+	if(isLittleEndian()){
+		unsigned short temp = tNumEntries;
+		tNumEntries=std::byteswap(temp);
+	}
+	file.write((const char*)&tNumEntries,2);//entry number
+
+	if(isLittleEndian()){
+		unsigned short temp = entryLength;
+		entryLength=std::byteswap(temp);
+	}
+	file.write((const char*)&entryLength,2);//entry length
+	file.write("\x00\x00\x00\x00",4);
+
+	unsigned int datLength = 9;
+	unsigned int msgDataOffset = 1;
+	for(unsigned int i=0;i<numEntries;i++){
+		unsigned int thisOffset = msgDataOffset;
+		if(isLittleEndian()){
+			unsigned int temp = thisOffset;
+			thisOffset=std::byteswap(temp);
+		}
+		file.write((const char*)&thisOffset,4);//entry length
+		msgDataOffset+=entries[i].message.length()+1;
+		datLength+=entries[i].message.length()+1;
+		if(entryLength==4) continue;
+
+		unsigned short startFrame = entries[i].startFrame;
+		if(isLittleEndian()){
+			unsigned short temp = startFrame;
+			startFrame=std::byteswap(temp);
+		}
+		file.write((const char*)&startFrame,2);//start frame
+
+		unsigned short endFrame = entries[i].endFrame;
+		if(isLittleEndian()){
+			unsigned short temp = endFrame;
+			endFrame=std::byteswap(temp);
+		}
+		file.write((const char*)&endFrame,2);//end frame
+
+		file << (unsigned char)entries[i].soundID;
+		file.write("\x00\x00\x00",3);
+	}
+
+	for(unsigned char i=0;i<extraBytes;i++) file.write("\x00",1);//padding
+
+	//Data section
+	file.write("DAT1",4);//magic
+	extraBytes=0;
+	while(datLength%32!=0){
+		datLength++;
+		extraBytes++;
+	}
+	fileLength+=datLength/32;
+	if(isLittleEndian()){
+		unsigned int temp = datLength;
+		datLength=std::byteswap(temp);
+	}
+	file.write((const char*)&datLength,4);//section length
+	file.write("\x00",1);//padding
+	for(unsigned int i=0;i<numEntries;i++){
+		file.write(entries[i].message.c_str(),entries[i].message.length());//message
+		file.write("\x00",1);//padding
+	}
+
+	for(unsigned char i=0;i<extraBytes;i++) file.write("\x00",1);//padding
+
+	file.seekp(std::fstream::beg+8);
+	if(isLittleEndian()){
+		unsigned int temp = fileLength;
+		fileLength=std::byteswap(temp);
+	}
+	file.write((const char*)&fileLength,4);//file length
 }
 
 unsigned int bmgMessageLength(char* msgBuffer){

@@ -30,6 +30,10 @@ void printHelp(){
 	std::cout << "-c : Create a new BMG file with the filename specified. This will overwrite any existing file as well." << std::endl;
 	std::cout << "-a : Use ANSI color codes instead of RGB values when rendering text. Use this if colors don't show up correctly in your terminal." << std::endl;
 	std::cout << "-d : Enable debug information, and display more BMG info for advanced users." << std::endl;
+	std::cout << "\x1b[1mEditing:\x1b[22m" << std::endl;
+	std::cout << "When exiting from a BMG entry, the file gets saved." << std::endl;
+	std::cout << "Use ^<letter> to enter a controller symbol, for example ^a will insert the A button, ^b will insert the B button, etc." << std::endl;
+	std::cout << "For left and right arrows, enter brackets, either [] or {}." << std::endl;
 }
 
 void hideCursor(){
