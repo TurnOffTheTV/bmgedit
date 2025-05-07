@@ -1,14 +1,10 @@
 # BMGEdit
 
-BMGEdit is a command-line tool for editing Nintendo game BMG files.
+![BMGEdit running in the Terminal app on Mac, editing Super Mario Sunshine's sys_message.bmg](bmgedit-terminal.png)
 
-This tool fully supports the following games:
+BMGEdit is a command-line tool for editing Super Mario Sunshine's BMG files.
 
-* Super Mario Sunshine
-
-These games are being investigated:
-
-* Super Mario Galaxy
+Maybe in the future, it will support more BMG types.
 
 ## Usage
 

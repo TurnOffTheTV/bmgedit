@@ -312,23 +312,27 @@ int runEditor(std::filesystem::path filename){
 				}
 
 				if(keyChar==1){
-					entries[entryIndex].message.insert(entryCharIndex,{'@'});
+					entries[entryIndex].message.insert(entryCharIndex,"@");
 					entryCharIndex++;
 				}
 				if(keyChar==2){
-					entries[entryIndex].message.insert(entryCharIndex,{'#'});
+					entries[entryIndex].message.insert(entryCharIndex,"#");
 					entryCharIndex++;
 				}
 				if(keyChar==3){
-					entries[entryIndex].message.insert(entryCharIndex,{'%'});
+					entries[entryIndex].message.insert(entryCharIndex,"%");
 					entryCharIndex++;
 				}
 				if(keyChar==12){
-					entries[entryIndex].message.insert(entryCharIndex,{'<'});
+					entries[entryIndex].message.insert(entryCharIndex,"<");
+					entryCharIndex++;
+				}
+				if(keyChar==18){
+					entries[entryIndex].message.insert(entryCharIndex,">");
 					entryCharIndex++;
 				}
 				if(keyChar==24){
-					entries[entryIndex].message.insert(entryCharIndex,{'+'});
+					entries[entryIndex].message.insert(entryCharIndex,"+");
 					entryCharIndex++;
 				}
 				if(keyChar==25){
@@ -336,12 +340,12 @@ int runEditor(std::filesystem::path filename){
 					entryCharIndex++;
 				}
 				if(keyChar==26){
-					entries[entryIndex].message.insert(entryCharIndex,{'$'});
+					entries[entryIndex].message.insert(entryCharIndex,"$");
 					entryCharIndex++;
 				}
 
 				if(keyChar==13){
-					entries[entryIndex].message.insert(entryCharIndex,{'\x0a'});
+					entries[entryIndex].message.insert(entryCharIndex,"\x0a");
 					entryCharIndex++;
 				}
 
