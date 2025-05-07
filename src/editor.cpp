@@ -1,10 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <vector>
 #include <editor.hpp>
 #include <terminal.hpp>
 #include <isLittleEndian.hpp>
 #include <BmgEntry.hpp>
+#include "empty_bmg.h"
 
 bool readOnly = false;
 bool newFile = false;
@@ -42,6 +44,9 @@ const char* ctrl_garbage = "garbage";
 //Current screen in editor
 enum EditorScreen screen = PICK_ENTRY;
 
+//Wether the editor cursor is on a control sequence
+bool cursorOnCtrl = false;
+
 int runEditor(std::filesystem::path filename){
 	//Error if file doesn't exist
 	if(!newFile && !std::filesystem::exists(filename)){
@@ -63,6 +68,12 @@ int runEditor(std::filesystem::path filename){
 		}else{
 			bmgFile.open(filename,std::fstream::in | std::fstream::out);
 		}
+	}
+
+	if(newFile){
+		bmgFile.write((const char*)empty_bmg_data,empty_bmg_size);
+		bmgFile.flush();
+		bmgFile.seekp(std::fstream::beg);
 	}
 
 	//Check for errors opening file
@@ -132,9 +143,13 @@ int runEditor(std::filesystem::path filename){
 
 	//Create entry list
 	bmgFile.seekp(48);
-	BmgEntry entries[numEntries];
+	//BmgEntry entries[numEntries];
+
+	std::vector<BmgEntry> entries;
 
 	for(unsigned int i=0;i<numEntries;i++){
+		BmgEntry newEntry;
+
 		//Save entry pointer
 		unsigned int entryStart = bmgFile.tellp();
 		//Get message offset
@@ -146,47 +161,51 @@ int runEditor(std::filesystem::path filename){
 		}
 
 		//Copy message
-		entries[i].message = std::string(messagesBuffer+msgOffset,bmgMessageLength(messagesBuffer+msgOffset));
+		newEntry.message = std::string(messagesBuffer+msgOffset,bmgMessageLength(messagesBuffer+msgOffset));
 
-		entries[i].charLength=0;
+		newEntry.charLength=0;
 
-		for(unsigned int j=0;j<entries[i].message.length();j++){
-			entries[i].charLength++;
-			if(entries[i].message[j]=='\x1a'){
-				unsigned char escLength = entries[i].message[j+1];
+		for(unsigned int j=0;j<newEntry.message.length();j++){
+			newEntry.charLength++;
+			if(newEntry.message[j]=='\x1a'){
+				unsigned char escLength = newEntry.message[j+1];
 				j+=escLength-1;
 				continue;
 			}
 		}
 		
-		if(entryLength==4) continue;
+		if(entryLength>4){
 
-		//Start frame
-		unsigned short startFrame;
-		bmgFile.read(reinterpret_cast<char *>(&startFrame),2);
-		if(isLittleEndian()){
-			unsigned short temp = startFrame;
-			startFrame=std::byteswap(temp);
+			//Start frame
+			unsigned short startFrame;
+			bmgFile.read(reinterpret_cast<char *>(&startFrame),2);
+			if(isLittleEndian()){
+				unsigned short temp = startFrame;
+				startFrame=std::byteswap(temp);
+			}
+			newEntry.startFrame=startFrame;
+
+			//End frame
+			unsigned short endFrame;
+			bmgFile.read(reinterpret_cast<char *>(&endFrame),2);
+			if(isLittleEndian()){
+				unsigned short temp = endFrame;
+				endFrame=std::byteswap(temp);
+			}
+			newEntry.endFrame=endFrame;
+
+			//Sound ID
+			bmgFile.read(reinterpret_cast<char *>(&newEntry.soundID),1);
+
 		}
-		entries[i].startFrame=startFrame;
 
-		//End frame
-		unsigned short endFrame;
-		bmgFile.read(reinterpret_cast<char *>(&endFrame),2);
-		if(isLittleEndian()){
-			unsigned short temp = endFrame;
-			endFrame=std::byteswap(temp);
-		}
-		entries[i].endFrame=endFrame;
-
-		//Sound ID
-		bmgFile.read(reinterpret_cast<char *>(&entries[i].soundID),1);
+		entries.push_back(newEntry);
 
 		//Skip to next entry
 		bmgFile.seekp(entryStart+entryLength);
 	}
 
-	//Print UI to console
+	//Run UI
 	system("stty raw");
 	bool runProgram = true;
 	unsigned int entryIndex = 0;
@@ -209,7 +228,7 @@ int runEditor(std::filesystem::path filename){
 		std::cout << "\x1b[1mBMGEdit\x1b[22m";
 		if(readOnly) std::cout << " | Read-only";
 		if(screen==PICK_ENTRY) std::cout << " | Press 'q' to quit";
-		if(screen==EDIT_ENTRY && !readOnly) std::cout << " | Press ^m for menu";
+		if(screen==EDIT_ENTRY && !readOnly) std::cout << " | Press ^e for menu";
 		if(screen==ENTRY_MENU || screen==PICK_CONTROL || screen==CONTROL_DETAIL || screen==EDIT_ENTRY && readOnly) std::cout << " | Press 'q' to return to entry list";
 		moveCursor(1,2);
 		for(unsigned int i=0;i<terminalWidth;i++) std::cout << '=';
@@ -218,13 +237,19 @@ int runEditor(std::filesystem::path filename){
 		if(screen!=ENTRY_MENU) menuIndex=0;
 		if(screen!=PICK_CONTROL) controlIndex=0;
 		switch(screen){
-			case PICK_ENTRY:
+			case PICK_ENTRY:{
+				bool lastPage = false;
 				for(unsigned int i=entryPickPage*(terminalHeight-2);i<(entryPickPage+1)*(terminalHeight-2);i++){
-					if(i>=numEntries) break;
+					if(i>numEntries) break;
 					moveCursor(1,i-entryPickPage*(terminalHeight-2)+3);
-					std::cout << "  Entry " << i << ": ";
-					bmgPrintLine(entries[i].message);
-					std::cout << "...";
+					if(i==numEntries){
+						std::cout << "  New Entry";
+						lastPage=true;
+					}else{
+						std::cout << "  Entry " << i << ": ";
+						bmgPrintLine(entries[i].message);
+						std::cout << "...";
+					}
 				}
 
 				moveCursor(1,entryIndex-entryPickPage*(terminalHeight-2)+3);
@@ -237,6 +262,17 @@ int runEditor(std::filesystem::path filename){
 					case '\x0d':
 						entryCharIndex=0;
 						screen=EDIT_ENTRY;
+						if(entryIndex==numEntries){
+							BmgEntry newEntry;
+							newEntry.message="";
+							if(entryLength>4){
+								newEntry.startFrame=0;
+								newEntry.endFrame=0;
+								newEntry.charLength=0;
+							}
+							entries.push_back(newEntry);
+							numEntries++;
+						}
 					break;
 					case '\x1b':
 						if(getchar()=='\x5b'){
@@ -248,17 +284,24 @@ int runEditor(std::filesystem::path filename){
 									}
 								break;
 								case '\x42':
-									if(entryIndex<numEntries-1){
-										entryIndex++;
-										if(entryIndex-entryPickPage*(terminalHeight-2)>terminalHeight-3) entryPickPage++;
+									if(lastPage){
+										if(entryIndex<numEntries){
+											entryIndex++;
+											if(entryIndex-entryPickPage*(terminalHeight-2)>terminalHeight-3) entryPickPage++;
+										}
+									}else{
+										if(entryIndex<numEntries-1){
+											entryIndex++;
+											if(entryIndex-entryPickPage*(terminalHeight-2)>terminalHeight-3) entryPickPage++;
+										}
 									}
 								break;
 							}
 						}
 					break;
 				}
-			break;
-			case EDIT_ENTRY:
+			break;}
+			case EDIT_ENTRY:{
 				bmgPrintMessage(entries[entryIndex].message,1,3,entryCharIndex);
 
 				if(!readOnly){
@@ -266,8 +309,26 @@ int runEditor(std::filesystem::path filename){
 					moveCursor(bmgGetColumn(entries[entryIndex].message,entryCharIndex)+1,bmgGetRow(entries[entryIndex].message,entryCharIndex)+3);
 				}
 
-				switch(getchar()){
-					case 13:
+				char keyChar = getchar();
+
+				if(keyChar>=32 && keyChar!=127){
+					entries[entryIndex].message.insert(entryCharIndex,{keyChar});
+					entryCharIndex++;
+				}
+
+				if(keyChar==13){
+					entries[entryIndex].message.insert(entryCharIndex,{'\x0a'});
+					entryCharIndex++;
+				}
+
+				switch(keyChar){
+					case 127:
+						if(entryCharIndex>0 && !cursorOnCtrl){
+							entries[entryIndex].message.erase(entryCharIndex-1,1);
+							entryCharIndex--;
+						}
+					break;
+					case 5:
 						if(readOnly) break;
 						hideCursor();
 						screen=ENTRY_MENU;
@@ -289,7 +350,7 @@ int runEditor(std::filesystem::path filename){
 						}
 					break;
 				}
-			break;
+			break;}
 			case ENTRY_MENU:
 				for(unsigned int i=menuPage*(terminalHeight-2);i<(menuPage+1)*(terminalHeight-2);i++){
 					if(i>=2) break;
@@ -636,9 +697,13 @@ unsigned int bmgGetColumn(std::string msg,unsigned int index){
 	if(index==0) return 0;
 
 	for(unsigned int i=0;i<msg.length();i++){
+		cursorOnCtrl=false;
 		charLength++;
 		col++;
-		if(msg[i]=='\x1a') i+=msg[i+1]-1;
+		if(msg[i]=='\x1a'){
+			i+=msg[i+1]-1;
+			cursorOnCtrl=true;
+		}
 		if(msg[i]=='\x0a') col=0;
 		if(charLength>=index) break;
 	}

@@ -6,4 +6,9 @@ file(GLOB_RECURSE SRCS *.c*)
 
 add_executable(bmgedit ${SRCS})
 
+include("../cmake/FileEmbed.cmake")
+FileEmbedSetup()
+FileEmbedAdd(${CMAKE_SOURCE_DIR}/empty.bmg)
+target_link_libraries(bmgedit file_embed)
+
 target_include_directories(bmgedit PUBLIC "${CMAKE_BINARY_DIR}" PUBLIC "../include")
