@@ -376,7 +376,14 @@ int runEditor(std::filesystem::path filename){
 					case 127:
 						if(entryCharIndex>0 && !readOnly){
 							if(cursorOnCtrl){
-
+								for(unsigned int i=bmgCursorIndex(entries[entryIndex].message,entryCharIndex);i>0;i--){
+									if(entries[entryIndex].message[i]=='\x1a'){
+										entries[entryIndex].message.erase(entries[entryIndex].message.begin()+i,entries[entryIndex].message.begin()+bmgCursorIndex(entries[entryIndex].message,entryCharIndex));
+										entryCharIndex--;
+										entries[entryIndex].charLength--;
+										break;
+									}
+								}
 							}else{
 								entries[entryIndex].message.erase(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)-1,1);
 								entryCharIndex--;
