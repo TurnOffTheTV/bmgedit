@@ -38,4 +38,6 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y,unsigned int 
 unsigned int bmgGetRow(std::string msg,unsigned int index);
 //Get column # of character in BMG
 unsigned int bmgGetColumn(std::string msg,unsigned int index);
+//Get the position in the string that the cursor is at
+unsigned int bmgCursorIndex(std::string msg,unsigned int cursorPos);
 #endif

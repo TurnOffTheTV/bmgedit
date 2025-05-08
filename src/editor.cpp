@@ -208,6 +208,8 @@ int runEditor(std::filesystem::path filename){
 	unsigned int menuPage = 0;
 	unsigned int controlIndex = 0;
 	unsigned int controlPickPage = 0;
+	unsigned int controlDetailIndex = 0;
+	std::string controlDetailInput = "";
 	while(runProgram){
 		//Set up terminal
 		setBackgroundColor(BLACK);
@@ -222,18 +224,27 @@ int runEditor(std::filesystem::path filename){
 		if(readOnly) std::cout << " | Read-only";
 		if(screen==PICK_ENTRY) std::cout << " | Press 'q' to quit";
 		if(screen==EDIT_ENTRY && !readOnly) std::cout << " | Press ^e for menu";
-		if(screen==ENTRY_MENU || screen==PICK_CONTROL || screen==CONTROL_DETAIL || screen==EDIT_ENTRY && readOnly) std::cout << " | Press 'q' to return to entry list";
+		if(screen==ENTRY_MENU || screen==EDIT_ENTRY && readOnly) std::cout << " | Press 'q' to return to entry list";
+		if(screen==PICK_CONTROL || screen==CONTROL_DETAIL) std::cout << " | Press 'q' to return to entry menu";
 		moveCursor(1,2);
 		for(unsigned int i=0;i<terminalWidth;i++) std::cout << '=';
 
 		//Draw screens
 		if(screen!=ENTRY_MENU) menuIndex=0;
-		if(screen!=PICK_CONTROL) controlIndex=0;
+		if(screen!=PICK_CONTROL && screen!=CONTROL_DETAIL){
+			controlIndex=0;
+			controlPickPage=0;
+		}
+		if(screen!=CONTROL_DETAIL){
+			controlDetailIndex=0;
+			controlDetailInput="";
+		}
 		switch(screen){
 			case PICK_ENTRY:{
 				bool lastPage = false;
 				for(unsigned int i=entryPickPage*(terminalHeight-2);i<(entryPickPage+1)*(terminalHeight-2);i++){
 					if(i>numEntries) break;
+					if(i>=numEntries && readOnly) break;
 					moveCursor(1,i-entryPickPage*(terminalHeight-2)+3);
 					if(i==numEntries){
 						std::cout << "  New Entry";
@@ -277,7 +288,7 @@ int runEditor(std::filesystem::path filename){
 									}
 								break;
 								case '\x42':
-									if(lastPage){
+									if(lastPage && !readOnly){
 										if(entryIndex<numEntries){
 											entryIndex++;
 											if(entryIndex-entryPickPage*(terminalHeight-2)>terminalHeight-3) entryPickPage++;
@@ -306,54 +317,71 @@ int runEditor(std::filesystem::path filename){
 
 				char keyChar = getchar();
 
-				if(keyChar>=32 && keyChar!=35 && keyChar!=36 && keyChar!=37 && keyChar!=43 && keyChar!=60 && keyChar!=62 && keyChar!=64 && keyChar!=127/* && keyChar!=165*/){
-					entries[entryIndex].message.insert(entryCharIndex,{keyChar});
-					entryCharIndex++;
-				}
+				if(!readOnly){
+					if(keyChar>=32 && keyChar!=35 && keyChar!=36 && keyChar!=37 && keyChar!=43 && keyChar!=60 && keyChar!=62 && keyChar!=64 && keyChar!=127/* && keyChar!=165*/){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),{keyChar});
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
 
-				if(keyChar==1){
-					entries[entryIndex].message.insert(entryCharIndex,"@");
-					entryCharIndex++;
-				}
-				if(keyChar==2){
-					entries[entryIndex].message.insert(entryCharIndex,"#");
-					entryCharIndex++;
-				}
-				if(keyChar==3){
-					entries[entryIndex].message.insert(entryCharIndex,"%");
-					entryCharIndex++;
-				}
-				if(keyChar==12){
-					entries[entryIndex].message.insert(entryCharIndex,"<");
-					entryCharIndex++;
-				}
-				if(keyChar==18){
-					entries[entryIndex].message.insert(entryCharIndex,">");
-					entryCharIndex++;
-				}
-				if(keyChar==24){
-					entries[entryIndex].message.insert(entryCharIndex,"+");
-					entryCharIndex++;
-				}
-				if(keyChar==25){
-					entries[entryIndex].message.insert(entryCharIndex,"¥");
-					entryCharIndex++;
-				}
-				if(keyChar==26){
-					entries[entryIndex].message.insert(entryCharIndex,"$");
-					entryCharIndex++;
-				}
+					if(keyChar==1){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"@");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==2){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"#");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==3){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"%");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==12){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"<");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==18){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),">");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==24){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"+");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==25){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"¥");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
+					if(keyChar==26){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"$");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
 
-				if(keyChar==13){
-					entries[entryIndex].message.insert(entryCharIndex,"\x0a");
-					entryCharIndex++;
+					if(keyChar==13){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x0a");
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+					}
 				}
 
 				switch(keyChar){
 					case 127:
-						if(entryCharIndex>0 && !cursorOnCtrl){
-							entries[entryIndex].message.erase(entryCharIndex-1,1);
-							entryCharIndex--;
+						if(entryCharIndex>0 && !readOnly){
+							if(cursorOnCtrl){
+
+							}else{
+								entries[entryIndex].message.erase(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)-1,1);
+								entryCharIndex--;
+								entries[entryIndex].charLength--;
+							}
 						}
 					break;
 					case 5:
@@ -379,16 +407,19 @@ int runEditor(std::filesystem::path filename){
 					break;
 				}
 			break;}
-			case ENTRY_MENU:
+			case ENTRY_MENU:{
 				for(unsigned int i=menuPage*(terminalHeight-2);i<(menuPage+1)*(terminalHeight-2);i++){
-					if(i>=2) break;
-					moveCursor(1,i-menuPage*(terminalHeight-2)+3);
+					if(i>=3) break;
+					moveCursor(3,i-menuPage*(terminalHeight-2)+3);
 					switch(i){
 						case 0:
-							std::cout << " Back to entry edit";
+							std::cout << "Back to entry edit";
 						break;
 						case 1:
-							std::cout << " Insert escape code";
+							std::cout << "Insert control code";
+						break;
+						case 2:
+							std::cout << "Delete entry";
 						break;
 					}
 				}
@@ -409,6 +440,12 @@ int runEditor(std::filesystem::path filename){
 							case 1:
 								screen=PICK_CONTROL;
 							break;
+							case 2:
+								entries.erase(entries.begin()+entryIndex);
+								numEntries--;
+								saveBmgFile(filename,entries,numEntries,entryLength);
+								screen=PICK_ENTRY;
+							break;
 						}
 					break;
 					case '\x1b':
@@ -421,7 +458,7 @@ int runEditor(std::filesystem::path filename){
 									}
 								break;
 								case '\x42':
-									if(menuIndex<1){
+									if(menuIndex<2){
 										menuIndex++;
 										if(menuIndex-menuPage*(terminalHeight-2)>terminalHeight-3) menuPage++;
 									}
@@ -430,23 +467,32 @@ int runEditor(std::filesystem::path filename){
 						}
 					break;
 				}
-			break;
-			case PICK_CONTROL:
+			break;}
+			case PICK_CONTROL:{
 				for(unsigned int i=controlPickPage*(terminalHeight-2);i<(controlPickPage+1)*(terminalHeight-2);i++){
-					if(i>=4) break;
-					moveCursor(1,i-controlPickPage*(terminalHeight-2)+3);
+					if(i>=7) break;
+					moveCursor(3,i-controlPickPage*(terminalHeight-2)+3);
 					switch(i){
 						case 0:
-							std::cout << " Delivery control";
+							std::cout << "Slow delivery";
 						break;
 						case 1:
-							std::cout << " Option box";
+							std::cout << "Auto-close";
 						break;
 						case 2:
-							std::cout << " Read value";
+							std::cout << "Speed";
 						break;
 						case 3:
-							std::cout << " Text color";
+							std::cout << "Define yes option";
+						break;
+						case 4:
+							std::cout << "Define no option";
+						break;
+						case 5:
+							std::cout << "Display flag";
+						break;
+						case 6:
+							std::cout << "Color text";
 						break;
 					}
 				}
@@ -456,7 +502,11 @@ int runEditor(std::filesystem::path filename){
 
 				switch(getchar()){
 					case 'q':
-						screen=PICK_ENTRY;
+						screen=ENTRY_MENU;
+					break;
+					case '\x0d':
+						screen=CONTROL_DETAIL;
+						controlPickPage=0;
 					break;
 					case '\x1b':
 						if(getchar()=='\x5b'){
@@ -468,7 +518,7 @@ int runEditor(std::filesystem::path filename){
 									}
 								break;
 								case '\x42':
-									if(controlIndex<3){
+									if(controlIndex<6){
 										controlIndex++;
 										if(controlIndex-controlPickPage*(terminalHeight-2)>terminalHeight-3) controlPickPage++;
 									}
@@ -477,14 +527,238 @@ int runEditor(std::filesystem::path filename){
 						}
 					break;
 				}
-			break;
-			case CONTROL_DETAIL:
-				switch(getchar()){
-					case 'q':
+			break;}
+			case CONTROL_DETAIL:{
+
+				bool skip = false;
+
+				switch(controlIndex){
+					case 0:
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x05\x00\x00\x00",5);
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
 						screen=EDIT_ENTRY;
+						skip=true;
+					break;
+					case 1:
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x05\x00\x00\x01",5);
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+						screen=EDIT_ENTRY;
+						skip=true;
+					break;
+					case 2:
+						moveCursor(1,3);
+						std::cout << "Speed value (0-255): " << controlDetailInput;
+						showCursor();
+					break;
+					case 3:
+						moveCursor(1,3);
+						std::cout << "Yes option text: " << controlDetailInput;
+						showCursor();
+					break;
+					case 4:
+						moveCursor(1,3);
+						std::cout << "No option text: " << controlDetailInput;
+						showCursor();
+					break;
+					case 5:
+						for(unsigned int i=controlPickPage*(terminalHeight-2);i<(controlPickPage+1)*(terminalHeight-2);i++){
+							if(i>=9) break;
+							moveCursor(3,i-controlPickPage*(terminalHeight-2)+3);
+							switch(i){
+								case 0:
+									std::cout << "Pianta village piantissimo record";
+								break;
+								case 1:
+									std::cout << "Gelato Beach piantissimo record";
+								break;
+								case 2:
+									std::cout << "Box game record";
+								break;
+								case 3:
+									std::cout << "Blue coin shines";
+								break;
+								case 4:
+									std::cout << "Number of bananas";
+								break;
+								case 5:
+									std::cout << "Number of coconuts";
+								break;
+								case 6:
+									std::cout << "Number of pineapples";
+								break;
+								case 7:
+									std::cout << "Number of durians";
+								break;
+								case 8:
+									std::cout << "Noki Bay piantissimo record";
+								break;
+							}
+						}
+
+						moveCursor(1,controlDetailIndex-controlPickPage*(terminalHeight-2)+3);
+						std::cout << '>';
+					break;
+					case 6:
+						for(unsigned int i=controlPickPage*(terminalHeight-2);i<(controlPickPage+1)*(terminalHeight-2);i++){
+							if(i>=6) break;
+							moveCursor(3,i-controlPickPage*(terminalHeight-2)+3);
+							switch(i){
+								case 0:
+									std::cout << "White (default)";
+								break;
+								case 1:
+									std::cout << "Grey";
+								break;
+								case 2:
+									std::cout << "Red";
+								break;
+								case 3:
+									std::cout << "Blue";
+								break;
+								case 4:
+									std::cout << "Yellow";
+								break;
+								case 5:
+									std::cout << "Green";
+								break;
+							}
+						}
+
+						moveCursor(1,controlDetailIndex-controlPickPage*(terminalHeight-2)+3);
+						std::cout << '>';
 					break;
 				}
-			break;
+
+				if(skip) break;
+
+				char keyChar = getchar();
+
+				if(controlIndex==2){
+					if(keyChar>=48 && keyChar<=57 && controlDetailIndex<3){
+						controlDetailInput.append({keyChar});
+						controlDetailIndex++;
+					}
+					if(keyChar==127 && controlDetailIndex>0){
+						controlDetailInput.erase(controlDetailIndex-1,1);
+						controlDetailIndex--;
+					}
+					if(keyChar=='\x0d' && controlDetailIndex>0){
+						unsigned int speed = std::stoi(controlDetailInput.c_str());
+						if(speed>255) speed=255;
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x06\x00\x00\x00",5);
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+5,1,(char)speed);
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+						screen=EDIT_ENTRY;
+						hideCursor();
+					}
+				}
+
+				if(controlIndex==3 || controlIndex==4){
+					if((keyChar>=65 && keyChar<=90 || keyChar>=97 && keyChar<=123) && controlDetailIndex<3){
+						controlDetailInput.append({keyChar});
+						controlDetailIndex++;
+					}
+					if(keyChar==127 && controlDetailIndex>0){
+						controlDetailInput.erase(controlDetailIndex-1,1);
+						controlDetailIndex--;
+					}
+					if(keyChar=='\x0d' && controlDetailIndex>0){
+						if(controlIndex==3) entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x01\x00\x00",5);
+						if(controlIndex==4) entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x01\x00\x01",5);
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+1,1,(char)(controlDetailIndex+5));
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+5,controlDetailInput);
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+						screen=EDIT_ENTRY;
+						hideCursor();
+					}
+				}
+
+				if(controlIndex==5){
+					if(keyChar=='\x1b'){
+						if(getchar()=='\x5b'){
+							switch(getchar()){
+								case '\x41':
+									if(controlDetailIndex>0){
+										controlDetailIndex--;
+										if(controlDetailIndex-controlPickPage*(terminalHeight-2)+3<3) controlPickPage--;
+									}
+								break;
+								case '\x42':
+									if(controlDetailIndex<8){
+										controlDetailIndex++;
+										if(controlDetailIndex-controlPickPage*(terminalHeight-2)>terminalHeight-3) controlPickPage++;
+									}
+								break;
+							}
+						}
+					}
+
+					if(keyChar=='\x0d'){
+						if(controlDetailIndex>=4 && controlDetailIndex<=7){
+							entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x06\x02\x00\x04",5);
+							entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+5,1,(unsigned char)(controlDetailIndex-4));
+						}else{
+							entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x05\x02\x00",4);
+							switch(controlDetailIndex){
+								case 0:
+									entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+4,"\x00",1);
+								break;
+								case 1:
+									entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+4,"\x01",1);
+									std::cout << "gelato";
+								break;
+								case 2:
+									entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+4,"\x02",1);
+								break;
+								case 3:
+									entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+4,"\x03",1);
+								break;
+								case 8:
+									entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+4,"\x06",1);
+								break;
+							}
+						}
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+						screen=EDIT_ENTRY;
+					}
+				}
+
+				if(controlIndex==6){
+					if(keyChar=='\x1b'){
+						if(getchar()=='\x5b'){
+							switch(getchar()){
+								case '\x41':
+									if(controlDetailIndex>0){
+										controlDetailIndex--;
+										if(controlDetailIndex-controlPickPage*(terminalHeight-2)+3<3) controlPickPage--;
+									}
+								break;
+								case '\x42':
+									if(controlDetailIndex<5){
+										controlDetailIndex++;
+										if(controlDetailIndex-controlPickPage*(terminalHeight-2)>terminalHeight-3) controlPickPage++;
+									}
+								break;
+							}
+						}
+					}
+
+					if(keyChar=='\x0d'){
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex),"\x1A\x06\xFF\x00\x00",5);
+						entries[entryIndex].message.insert(bmgCursorIndex(entries[entryIndex].message,entryCharIndex)+5,1,(unsigned char)controlDetailIndex);
+						entryCharIndex++;
+						entries[entryIndex].charLength++;
+						screen=EDIT_ENTRY;
+					}
+				}
+
+				if(keyChar=='q') screen=ENTRY_MENU;
+			break;}
 		}
 	}
 
@@ -678,7 +952,7 @@ void bmgPrintMessage(std::string msg,unsigned int x,unsigned int y,unsigned int 
 						if(msg[i+4]=='\x01') std::cout << ctrl_autoClose;
 						if(msg[i+4]=='\x00') std::cout << ctrl_slow;
 					}else if (escLength==6){
-						if(msg[i+4]=='\x00') printf(ctrl_speed,(int)msg[i+5]);
+						if(msg[i+4]=='\x00') printf(ctrl_speed,(unsigned char)msg[i+5]);
 					}else{
 						std::cout << ctrl_unknown;
 					}
@@ -844,5 +1118,27 @@ unsigned int bmgGetColumn(std::string msg,unsigned int index){
 		if(charLength>=index) break;
 	}
 
+	return col;
+}
+
+unsigned int bmgCursorIndex(std::string msg,unsigned int cursorPos){
+	unsigned int col = 0;
+	unsigned int charLength = 0;
+
+	if(cursorPos==0) return 0;
+
+	for(unsigned int i=0;i<msg.length();i++){
+		//cursorOnCtrl=false;
+		charLength++;
+		col++;
+		if(msg[i]=='\x1a'){
+			col+=msg[i+1]-1;
+			i+=msg[i+1]-1;
+			//cursorOnCtrl=true;
+		}
+		if(charLength>=cursorPos) break;
+	}
+
+	//std::cout << col;
 	return col;
 }
